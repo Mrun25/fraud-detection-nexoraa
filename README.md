@@ -294,7 +294,22 @@ The **threshold selection problem** is the central trade-off in any fraud detect
 
 ---
 
-### Objective 9 — Recommendations
+### Objective 9 — Strategic Recommendations for Fraud Prevention & Monitoring
+
+To evolve the platform from *reactive fraud detection* to *proactive fraud prevention*, the following strategic roadmap is recommended:
+
+**1. Preventative Measures (Stopping Fraud at the Source)**
+- **Identity & Device Fingerprinting:** Implement robust device fingerprinting at registration. Block new accounts sharing a device footprint with known bad actors *before* they can transact.
+- **API Rate Limiting (Velocity Throttling):** Enforce strict rate limits on payment endpoints to prevent automated card-testing scripts and burst velocity fraud.
+- **KYC Checkpoints:** Restrict high-risk actions (e.g., first withdrawal, large transfers) until Identity Verification (KYC) is complete. This cuts off the fraudster's "exit path."
+- **Promo Code Hardening:** Tie promo bonuses to verified identities rather than just accounts, making bonus farming economically unviable.
+
+**2. Monitoring & Detection Enhancements**
+- **Supervised ML Deployment:** Transition from the unsupervised Isolation Forest to the newly trained XGBoost model in production for higher precision.
+- **Graph Network Analytics:** Deploy graph databases (e.g., Neo4j) to automatically map complex fraud rings and money-mule networks that simple SQL rules miss.
+- **Real-Time Geolocation Tracking:** Enforce the "Impossible Travel" rule dynamically via streaming analytics (e.g., Apache Kafka + Flink) instead of batch processing.
+
+**Summary Table of Recommendations:**
 
 | Priority | Recommendation | Expected Impact |
 |----------|----------------|----------------|
@@ -302,9 +317,9 @@ The **threshold selection problem** is the central trade-off in any fraud detect
 | 🔴 Critical | Real-time velocity throttling (API rate limit) | Prevents card-testing and burst fraud |
 | 🔴 Critical | Promo codes tied to verified identity (not account) | Eliminates bonus farming |
 | 🟠 High | Device fingerprinting at registration | Blocks duplicate account creation |
-| 🟠 High | Geo-velocity anomaly detection | Catches impossible travel/VPN fraud |
+| 🟠 High | Graph Network Analytics for Referral Rings | Automatically maps complex, multi-node fraud networks |
 | 🟠 High | Referral bonus with 30-day verified transaction window | Eliminates inactive account referral rings |
-| 🟢 Medium | Upgrade to supervised XGBoost/LightGBM | +15% recall improvement with labeled data |
+| 🟢 Medium | Deploy the XGBoost Model to Production | Drives higher precision using the new labeled dataset |
 | 🟢 Medium | Automated Slack/email alerts on fraud rate spike | Faster incident response |
 | 🟢 Medium | Tiered review SLAs by risk score | Prioritises analyst time correctly |
 
