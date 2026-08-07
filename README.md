@@ -23,6 +23,37 @@ An online payment platform has identified unusual transaction patterns and suspe
 
 ---
 
+## 📊 Dashboard Screenshots
+
+### Executive Overview
+![Executive Overview](Executive%20overview.png)
+
+### Transaction Analysis
+![Transaction Analysis](Transaction%20Analysis.png)
+
+### User Risk Analysis
+![User Risk Analysis](User%20Risk%20Analysis.png)
+
+### Bonus and Referral Fraud
+![Bonus and Referral Fraud](Bonus%20and%20Referral%20Fraud.png)
+
+**Interactive HTML Dashboard:** Open `dashboard.html` in any browser (no server required)
+
+Charts included:
+| Chart | Description |
+|-------|-------------|
+| `01_eda_overview.png` | Platform overview: amounts, hourly patterns, merchant breakdown |
+| `02_duplicate_accounts.png` | Duplicate signal types, score distribution, country breakdown |
+| `03_suspicious_transactions.png` | Isolation Forest scatter, suspicion score distribution, confusion matrix |
+| `04_bonus_abuse.png` | Claim frequency, promo code abuse, detection accuracy |
+| `05_referral_fraud.png` | Fraud signals, top referrers, score distribution |
+| `06_fraud_rules.png` | All 11 rules and their flagged record counts |
+| `07_risk_scoring.png` | Risk score histogram, tier distribution, component weights |
+| `08_fp_fn_analysis.png` | Threshold trade-off, business cost analysis |
+| `09_monitoring_dashboard.png` | KPI cards, rolling fraud rate, daily alert volume |
+
+---
+
 ## 📁 Repository Structure
 
 ```
@@ -255,37 +286,6 @@ The **threshold selection problem** is the central trade-off in any fraud detect
 | 🟢 Medium | Upgrade to supervised XGBoost/LightGBM | +15% recall improvement with labeled data |
 | 🟢 Medium | Automated Slack/email alerts on fraud rate spike | Faster incident response |
 | 🟢 Medium | Tiered review SLAs by risk score | Prioritises analyst time correctly |
-
----
-
-## 📊 Dashboard Screenshots
-
-### Executive Overview
-![Executive Overview](Executive%20overview.png)
-
-### Transaction Analysis
-![Transaction Analysis](Transaction%20Analysis.png)
-
-### User Risk Analysis
-![User Risk Analysis](User%20Risk%20Analysis.png)
-
-### Bonus and Referral Fraud
-![Bonus and Referral Fraud](Bonus%20and%20Referral%20Fraud.png)
-
-**Interactive HTML Dashboard:** Open `dashboard.html` in any browser (no server required)
-
-Charts included:
-| Chart | Description |
-|-------|-------------|
-| `01_eda_overview.png` | Platform overview: amounts, hourly patterns, merchant breakdown |
-| `02_duplicate_accounts.png` | Duplicate signal types, score distribution, country breakdown |
-| `03_suspicious_transactions.png` | Isolation Forest scatter, suspicion score distribution, confusion matrix |
-| `04_bonus_abuse.png` | Claim frequency, promo code abuse, detection accuracy |
-| `05_referral_fraud.png` | Fraud signals, top referrers, score distribution |
-| `06_fraud_rules.png` | All 11 rules and their flagged record counts |
-| `07_risk_scoring.png` | Risk score histogram, tier distribution, component weights |
-| `08_fp_fn_analysis.png` | Threshold trade-off, business cost analysis |
-| `09_monitoring_dashboard.png` | KPI cards, rolling fraud rate, daily alert volume |
 
 ---
 
