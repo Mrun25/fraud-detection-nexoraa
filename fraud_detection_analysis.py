@@ -25,8 +25,10 @@ import matplotlib.gridspec as gridspec
 import seaborn as sns
 from sklearn.ensemble import IsolationForest
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import classification_report, confusion_matrix, roc_auc_score
+from sklearn.metrics import classification_report, confusion_matrix, roc_auc_score, precision_recall_curve, auc
 from sklearn.model_selection import train_test_split
+import xgboost as xgb
+import shap
 import warnings
 warnings.filterwarnings("ignore")
 
@@ -54,16 +56,16 @@ plt.rcParams.update({
 sns.set_palette([COLORS["primary"], COLORS["danger"], COLORS["warning"],
                  COLORS["safe"], COLORS["accent"], COLORS["mid"]])
 
-OUT = "/home/claude/fraud-detection/outputs"
+OUT = "outputs"
 
 # ══════════════════════════════════════════════════════════════════════════════
 # LOAD DATA
 # ══════════════════════════════════════════════════════════════════════════════
 print("Loading data...")
-users = pd.read_csv("/home/claude/fraud-detection/data/users.csv", parse_dates=["registration_date"])
-txns  = pd.read_csv("/home/claude/fraud-detection/data/transactions.csv", parse_dates=["transaction_date"])
-refs  = pd.read_csv("/home/claude/fraud-detection/data/referrals.csv",    parse_dates=["referral_date"])
-bonus = pd.read_csv("/home/claude/fraud-detection/data/bonuses.csv",      parse_dates=["claimed_date"])
+users = pd.read_csv("data/users.csv", parse_dates=["registration_date"])
+txns  = pd.read_csv("data/transactions.csv", parse_dates=["transaction_date"])
+refs  = pd.read_csv("data/referrals.csv",    parse_dates=["referral_date"])
+bonus = pd.read_csv("data/bonuses.csv",      parse_dates=["claimed_date"])
 
 print(f"  Users: {len(users):,}  |  Txns: {len(txns):,}  |  Referrals: {len(refs):,}  |  Bonuses: {len(bonus):,}")
 
@@ -227,6 +229,14 @@ txns_sorted["time_since_last_tx_min"] = (
 )
 txns_sorted["rapid_tx_flag"] = (txns_sorted["time_since_last_tx_min"] < 5).astype(int)
 
+# R12: Impossible Travel (IP velocity)
+txns_sorted["prev_ip"] = txns_sorted.groupby("user_id")["ip_address"].shift(1)
+txns_sorted["impossible_travel_flag"] = (
+    (txns_sorted["time_since_last_tx_min"] < 120) & 
+    (txns_sorted["ip_address"] != txns_sorted["prev_ip"]) & 
+    (txns_sorted["prev_ip"].notna())
+).astype(int)
+
 # User-level aggregates
 user_stats = txns.groupby("user_id").agg(
     tx_count          = ("transaction_id", "count"),
@@ -253,7 +263,7 @@ txns_sorted["iso_flag"]   = (txns_sorted["iso_score"] == -1).astype(int)
 
 # Merge back
 txns = txns.merge(txns_sorted[["transaction_id", "iso_flag", "anomaly_score",
-                                 "time_since_last_tx_min", "rapid_tx_flag"]],
+                                 "time_since_last_tx_min", "rapid_tx_flag", "impossible_travel_flag"]],
                    on="transaction_id", how="left")
 
 # Rule-based flags
@@ -332,6 +342,55 @@ plt.tight_layout()
 plt.savefig(f"{OUT}/03_suspicious_transactions.png", dpi=150, bbox_inches="tight")
 plt.close()
 print("  Saved: 03_suspicious_transactions.png")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION 3B — SUPERVISED ML & EXPLAINABILITY (XGBOOST + SHAP)
+# ══════════════════════════════════════════════════════════════════════════════
+print("\n[3B/9] Supervised ML Upgrade (XGBoost) & Explainability...")
+
+# Train XGBoost
+features_xgb = ["amount_log", "is_odd_hour", "is_round_amt", "rapid_tx_flag", "is_international", "impossible_travel_flag"]
+X_xgb = txns[features_xgb].fillna(0)
+y_xgb = txns["_is_fraud"].astype(int)
+
+X_train, X_test, y_train, y_test = train_test_split(X_xgb, y_xgb, test_size=0.3, random_state=42, stratify=y_xgb)
+xgb_clf = xgb.XGBClassifier(n_estimators=100, max_depth=4, learning_rate=0.1, random_state=42, eval_metric="logloss")
+xgb_clf.fit(X_train, y_train)
+
+# Predictions
+txns["xgb_prob"] = xgb_clf.predict_proba(X_xgb)[:, 1]
+txns["xgb_flag"] = (txns["xgb_prob"] > 0.5).astype(int)
+
+# Comparison Plot
+fig, ax = plt.subplots(figsize=(8, 6))
+fig.suptitle("Supervised vs Unsupervised ML Performance", fontsize=14, fontweight="bold", color=COLORS["primary"])
+
+iso_score_norm = (txns["anomaly_score"] - txns["anomaly_score"].min()) / (txns["anomaly_score"].max() - txns["anomaly_score"].min())
+prec_iso, rec_iso, _ = precision_recall_curve(y_xgb, iso_score_norm)
+prec_xgb, rec_xgb, _ = precision_recall_curve(y_xgb, txns["xgb_prob"])
+
+ax.plot(rec_iso, prec_iso, label=f"Isolation Forest (AUC={auc(rec_iso, prec_iso):.2f})", color=COLORS["warning"], linewidth=2)
+ax.plot(rec_xgb, prec_xgb, label=f"XGBoost (AUC={auc(rec_xgb, prec_xgb):.2f})", color=COLORS["safe"], linewidth=2)
+ax.set_title("Precision-Recall Curve Comparison", fontweight="bold")
+ax.set_xlabel("Recall")
+ax.set_ylabel("Precision")
+ax.legend()
+plt.tight_layout()
+plt.savefig(f"{OUT}/10_model_comparison.png", dpi=150, bbox_inches="tight")
+plt.close()
+print("  Saved: 10_model_comparison.png")
+
+# SHAP Explainability
+explainer = shap.TreeExplainer(xgb_clf)
+shap_values = explainer.shap_values(X_xgb)
+fig = plt.figure(figsize=(10, 6))
+shap.summary_plot(shap_values, X_xgb, show=False)
+plt.title("SHAP Values: Model Explainability", fontweight="bold", pad=20)
+plt.tight_layout()
+plt.savefig(f"{OUT}/11_shap_explainability.png", dpi=150, bbox_inches="tight")
+plt.close()
+print("  Saved: 11_shap_explainability.png")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -490,6 +549,7 @@ rules = {
     "R09 — Multi Bonus Claim (>2)":  bonus_per_user["multi_claim_flag"].sum(),
     "R10 — Self Referral (same dev/IP)": refs["self_referral_flag"].sum(),
     "R11 — High Volume Referrer":    refs["high_volume_flag"].sum(),
+    "R12 — Impossible Travel":       txns["impossible_travel_flag"].fillna(0).sum(),
 }
 
 fig, ax = plt.subplots(figsize=(12, 7))
@@ -523,6 +583,7 @@ tx_risk = txns.groupby("user_id").agg(
     iso_flags          = ("iso_flag",           "sum"),
     odd_hour_ratio     = ("is_odd_hour",        "mean"),
     intl_ratio         = ("is_international",   "mean"),
+    impossible_travel  = ("impossible_travel_flag", "sum"),
 ).reset_index()
 
 # Bonus risk
@@ -553,6 +614,7 @@ risk_df["risk_score"] = (
     risk_df["iso_flags"].clip(0, 5) * 3  +
     risk_df["odd_hour_ratio"]       * 5  +
     risk_df["intl_ratio"]           * 4  +
+    (risk_df["impossible_travel"] > 0).astype(int) * 15 +
     risk_df["bonus_abuse_flag"]     * 8  +
     risk_df["ref_fraud_as_referrer"].clip(0, 5) * 4 +
     risk_df["ref_fraud_as_referee"].clip(0, 5)  * 3
@@ -599,6 +661,7 @@ feat_importance = pd.Series({
     "Bonus Abuse Flag":    8,
     "KYC Not Verified":    8,
     "Suspicion Score Avg": 8,
+    "Impossible Travel":   15,
     "International Ratio": 4,
     "Referral Fraud":      4,
     "Odd Hour Ratio":      5,
@@ -844,17 +907,17 @@ txns_export = txns[[
     "_is_fraud"
 ]].copy()
 txns_export.columns = [c.replace("_is_fraud", "ground_truth_fraud") for c in txns_export.columns]
-txns_export.to_csv("/home/claude/fraud-detection/data/transactions_enriched.csv", index=False)
+txns_export.to_csv("data/transactions_enriched.csv", index=False)
 
 # Users with risk scores
 risk_export = risk_df.merge(
     users[["user_id", "email", "country", "registration_date", "kyc_status",
             "is_verified", "account_age_days", "total_deposits", "total_withdrawals"]],
     on="user_id")
-risk_export.to_csv("/home/claude/fraud-detection/data/users_risk_scored.csv", index=False)
+risk_export.to_csv("data/users_risk_scored.csv", index=False)
 
 # Daily KPIs
-daily_kpis.to_csv("/home/claude/fraud-detection/data/daily_kpis.csv", index=False)
+daily_kpis.to_csv("data/daily_kpis.csv", index=False)
 
 # Summary stats
 summary = {
@@ -872,7 +935,7 @@ summary = {
         round(prec, 1), round(rec, 1)
     ]
 }
-pd.DataFrame(summary).to_csv("/home/claude/fraud-detection/data/summary_stats.csv", index=False)
+pd.DataFrame(summary).to_csv("data/summary_stats.csv", index=False)
 
 print("  Exported: transactions_enriched.csv")
 print("  Exported: users_risk_scored.csv")
@@ -883,4 +946,4 @@ print("\n" + "="*60)
 print("✅  ALL ANALYSIS COMPLETE")
 print("="*60)
 print(f"  Charts saved to: {OUT}/")
-print(f"  Data exports:    /home/claude/fraud-detection/data/")
+print(f"  Data exports:    data/")

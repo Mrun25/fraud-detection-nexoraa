@@ -240,6 +240,28 @@ ORDER BY suspicious_pct DESC, total_referrals DESC;
 
 
 -- ════════════════════════════════════════════════════════════════════════
+-- RULE R12 — Impossible Travel / IP Velocity
+-- Flags users who have transactions from two different IP addresses within 2 hours
+-- ════════════════════════════════════════════════════════════════════════
+SELECT
+    t1.user_id,
+    t1.transaction_id AS txn_1,
+    t2.transaction_id AS txn_2,
+    t1.transaction_date AS time_1,
+    t2.transaction_date AS time_2,
+    t1.ip_address AS ip_1,
+    t2.ip_address AS ip_2,
+    'IMPOSSIBLE_TRAVEL' AS fraud_rule
+FROM transactions t1
+JOIN transactions t2
+    ON  t1.user_id = t2.user_id
+    AND t1.transaction_id != t2.transaction_id
+    AND t2.transaction_date BETWEEN t1.transaction_date AND DATETIME(t1.transaction_date, '+2 hours')
+    AND t1.ip_address != t2.ip_address
+ORDER BY t1.transaction_date DESC;
+
+
+-- ════════════════════════════════════════════════════════════════════════
 -- COMPOSITE RISK SCORE QUERY
 -- Combines all rule signals into a single per-user risk score
 -- ════════════════════════════════════════════════════════════════════════
