@@ -1,0 +1,12 @@
+metric,value
+Total Users,2000.0
+Total Transactions,10322.0
+Total Referrals,600.0
+Total Bonus Claims,1334.0
+Duplicate Accounts Detected,165.0
+Suspicious Transactions,642.0
+High+Critical Risk Users,6.0
+Bonus Abusers Detected,338.0
+Referral Fraud Detected,17.0
+Fraud Detection Precision (%),98.9
+Fraud Detection Recall (%),68.4
