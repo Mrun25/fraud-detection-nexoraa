@@ -114,7 +114,7 @@ fraud-detection/
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/<your-username>/fraud-detection-nexoraa.git
+git clone https://github.com/Mrun25/fraud-detection-nexoraa.git
 cd fraud-detection-nexoraa
 
 # 2. Install dependencies
